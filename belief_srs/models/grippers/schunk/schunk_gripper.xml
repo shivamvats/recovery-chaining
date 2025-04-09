@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<mujoco model="schunk_gripper">
+  <asset>
+    <mesh name="schunk_base" file="./meshes/base.stl"/>
+    <mesh name="schunk_left_slider" file="./meshes/left_slider.stl"/>
+    <mesh name="schunk_right_slider" file="./meshes/right_slider.stl"/>
+    <mesh name="schunk_finger" file="./meshes/finger.stl"/>
+  </asset>
+  <worldbody>
+    <!-- gripper base -->
+    <body name="schunk_base" pos="0.0 0 0.0" quat="1 0 0 0">
+      <site name="ft_frame" pos="0 0 0" size="0.01 0.01 0.01" rgba="1 0 0 1"/>
+      <geom name="schunk_base_col" type="mesh" pos="0.0 0 0.0" quat="1 0 0 0" mesh="schunk_base" rgba="0.7 0.7 0.7 1.0" group="0"/>
+      <geom name="schunk_base_vis" type="mesh" pos="0.0 0 0.0" quat="1 0 0 0" mesh="schunk_base" rgba="0.7 0.7 0.7 1.0" contype="0" conaffinity="0" group="1"/>
+      <!-- end-effector visual site -->
+      <body name="eef" pos="0 0 0">
+        <site name="grip_site" pos="0 0 0" size="0.01 0.01 0.01" rgba="1 0 0 0.3" type="sphere" group="1"/>
+        <site name="ee_x" pos="0.1 0 0" size="0.005 .1" quat="0.707105  0 0.707108 0 " rgba="1 0 0 0.3" type="cylinder" group="1"/>
+        <site name="ee_y" pos="0 0.1 0" size="0.005 .1" quat="0.707105 0.707108 0 0" rgba="0 1 0 0.3" type="cylinder" group="1"/>
+        <site name="ee_z" pos="0 0 0.1" size="0.005 .1" quat="1 0 0 0" rgba="0 0 1 0.3" type="cylinder" group="1"/>
+        <site name="grip_site_cylinder" pos="0 0 0.3" size="0.005 0.4" rgba="0 0 0 0" type="cylinder" group="1"/>
+        <!-- <site name="grip_site" pos="0 0 0.015" size="0.01 0.01 0.01" rgba="1 0 0 0.3" type="sphere" group="1"/> -->
+        <!-- <site name="ee_x" pos="0.03 0 0.015" size="0.005 .03" quat="0.707105  0 0.707108 0 " rgba="1 0 0 0.3" type="cylinder" group="1"/> -->
+        <!-- <site name="ee_y" pos="0 0.03 0.015" size="0.005 .03" quat="0.707105 0.707108 0 0" rgba="0 1 0 0.3" type="cylinder" group="1"/> -->
+        <!-- <site name="ee_z" pos="0 0 0.045" size="0.005 .03" quat="1 0 0 0" rgba="0 0 1 0.3" type="cylinder" group="1"/> -->
+        <!-- <site name="grip_site_cylinder" pos="0 0 0.3" size="0.005 0.4" rgba="0 0 0 0" type="cylinder" group="1"/> -->
+      </body>
+      <!-- left slider -->
+      <body name="schunk_left_slider">
+        <geom name="schunk_left_slider_col" type="mesh" mesh="schunk_left_slider" pos="0 0.0145 0.061014" quat="1 0 0 0" rgba="0.7 0.7 0.7 1.0" group="0"/>
+        <geom name="schunk_left_slider_vis" type="mesh" mesh="schunk_left_slider" pos="0 0.0145 0.061014" quat="1 0 0 0" rgba="0.7 0.7 0.7 1.0" contype="0" conaffinity="0" group="1"/>
+        <!-- left finger -->
+        <body name="schunk_left_finger">
+          <geom name="schunk_left_finger_col" type="mesh" mesh="schunk_finger" pos="0 0.01 0.076" quat="0.5 0.5 0.5 0.5" rgba="0.7 0.7 0.7 1.0" group="0"/>
+          <geom name="schunk_left_finger_vis" type="mesh" mesh="schunk_finger" pos="0 0.01 0.076" quat="0.5 0.5 0.5 0.5" rgba="0.7 0.7 0.7 1.0" contype="0" conaffinity="0" group="1"/>
+        </body>
+      </body>
+      <!-- right slider -->
+      <body name="schunk_right_slider">
+        <geom name="schunk_right_slider_col" type="mesh" mesh="schunk_right_slider" pos="0 -0.0145 0.061014" quat="0 0 0 1" rgba="0.7 0.7 0.7 1.0" group="0"/>
+        <geom name="schunk_right_slider_vis" type="mesh" mesh="schunk_right_slider" pos="0 -0.0145 0.061014" quat="0 0 0 1" rgba="0.7 0.7 0.7 1.0" contype="0" conaffinity="0" group="1"/>
+        <!-- right finger -->
+        <body name="schunk_right_finger">
+          <geom name="schunk_right_finger_col" type="mesh" mesh="schunk_finger" pos="0.00 -0.01 0.076" quat="-0.5 -0.5 0.5 0.5" rgba="0.7 0.7 0.7 1.0" group="0"/>
+          <geom name="schunk_right_finger_vis" type="mesh" mesh="schunk_finger" pos="0.00 -0.01 0.076" quat="-0.5 -0.5 0.5 0.5" rgba="0.7 0.7 0.7 1.0" contype="0" conaffinity="0" group="1"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <sensor>
+    <force name="force_ee" site="ft_frame"/>
+    <torque name="torque_ee" site="ft_frame"/>
+  </sensor>
+</mujoco>

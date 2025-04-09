@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<mujoco model="melfa">
+  <asset>
+    <mesh name="base" file="meshes/0_base.stl"/>
+    <mesh name="shoulder" file="meshes/1_shoulder.stl"/>
+    <mesh name="upperarm" file="meshes/2_upperarm.stl"/>
+    <mesh name="elbow" file="meshes/3_elbow.stl"/>
+    <mesh name="forearm" file="meshes/4_forearm.stl"/>
+    <mesh name="wrist" file="meshes/5_wrist.stl"/>
+    <mesh name="interface" file="meshes/6_interface.stl"/>
+    <mesh name="base_vis" file="meshes/0_base.stl"/>
+    <mesh name="shoulder_vis" file="meshes/1_shoulder.stl"/>
+    <mesh name="upperarm_vis" file="meshes/2_upperarm.stl"/>
+    <mesh name="elbow_vis" file="meshes/3_elbow.stl"/>
+    <mesh name="forearm_vis" file="meshes/4_forearm.stl"/>
+    <mesh name="wrist_vis" file="meshes/5_wrist.stl"/>
+    <mesh name="interface_vis" file="meshes/6_interface.stl"/>
+  </asset>
+  <worldbody>
+    <!-- Robot -->
+    <body name="base" pos="0 0 0">
+      <inertial fullinertia="0.0233334837381268 0.0396660521437845 0.0393549496154418 0.0018166159585504 0.000612545000180929 0.000266976839891407" mass="5.67876980566935" pos="0 0 0"/>
+      <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.8 0.8 0.8 1" mesh="base_vis" />
+      <geom type="mesh" rgba="0.8 0.8 0.8 1" mesh="base" name="base_col"/>
+      <!-- shoulder -->
+      <body name="shoulder" pos="0 0 0.254">
+        <inertial fullinertia="0.0156208022020755 0.0139788878690318 0.0176719100089498 -0.000414345118278719 0.000504226573890742 0.000273792202257283" mass="3.88778008852388" pos="0 0 0"/>
+        <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.8 0.8 0.8 1" mesh="shoulder_vis" name="shoulder_visual"/>
+        <geom type="mesh" rgba="0.8 0.8 0.8 1" mesh="shoulder" name="shoulder_col"/>
+        <joint name="joint1" pos="0 0 0" axis="0 0 1" limited="true" range="-4.1886 4.1886" damping="0.001" frictionloss="0.01"/>
+        <!-- upperarm -->
+        <body name="upperarm" pos="0 0.0914 0" euler="-1.5707963267949 0 0">
+          <inertial fullinertia="0.135791777434424 0.00952151157985761 0.137337654715902 -8.71171902704424E-07 -1.58525944476388E-08 4.68524920611684E-08" mass="5.11534846315906" pos="0 0 0"/>
+          <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.8 0.8 0.8 1" mesh="upperarm_vis" name="upperarm_visual"/>
+          <geom type="mesh" rgba="0.8 0.8 0.8 1" mesh="upperarm" name="upperarm_col"/>
+          <joint name="joint2" pos="0 0 0" axis="0 0 1" limited="true" range="-2.583 2.583" damping="0.001" frictionloss="0.01"/>
+          <!-- elbow -->
+          <body name="elbow" pos="0 -0.41 0.0" euler="3.14159265358979 0 0">
+            <inertial fullinertia="0.02724 0.01868 0.023147 -0.00061084 0.0002885 -0.0011338" mass="4.8026" pos="0 0 0"/>
+            <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.8 0.8 0.8 1" mesh="elbow_vis" name="elbow_visual"/>
+            <geom type="mesh" rgba="0.8 0.8 0.8 1" mesh="elbow" name="elbow_col"/>
+            <joint name="joint3" pos="0 0 0" axis="0 0 -1" limited="true" range="-2.6179 2.6179" damping="0.001" frictionloss="0.01"/>
+            <!-- forearm -->
+            <body name="forearm" pos="0 0 0.0914" euler="1.5707963267949 0 -1.5707963267949">
+              <inertial fullinertia="0.056629 0.061624 0.018826 -7.5385E-06 0.0013572 -2.2455E-05" mass="5.3513" pos="0 0 0"/>
+              <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.8 0.8 0.8 1" mesh="forearm_vis" name="forearm_visual"/>
+              <geom type="mesh" rgba="0.8 0.8 0.8 1" mesh="forearm" name="forearm_col"/>
+              <joint name="joint4" pos="0 0 0" axis="0 0 -1" limited="true" range="-3.4906 3.4906" damping="0.001" frictionloss="0.01"/>
+              <!-- wrist -->
+              <body name="wrist" pos="0.0 0.0 -0.5" euler="1.5707963267949 -1.5707963267949 0">
+                <inertial fullinertia="0.00367828451248864 0.00261475957126221 0.00382792265719561 -0.000159982809834187 -1.53641616758844E-06 -2.31770253943184E-05" mass="1.53467274377457" pos="0 0 0"/>
+                <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.8 0.8 0.8 1" mesh="wrist_vis" name="wrist_visual"/>
+                <geom type="mesh" rgba="0.8 0.8 0.8 1" mesh="wrist" name="wrist_col"/>
+                <joint name="joint5" pos="0 0 0" axis="0 0 -1" limited="true" range="-2.0943 2.0943" damping="0.001" frictionloss="0.01"/>
+                <!-- interface -->
+                <body name="interface" pos="0.0 -0.125 0" euler="1.5707963267949 0 0">
+                  <inertial fullinertia="2.45695751179487E-05 2.4910782260344E-05 4.70218708484803E-05 -1.33389492472439E-11 1.06956809906502E-12 3.35519226633173E-08" mass="0.0646745696460533" pos="0 0 0"/>
+                  <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.8 0.8 0.8 1" mesh="interface_vis" name="interface_visual"/>
+                  <geom type="mesh" rgba="0.8 0.8 0.8 1" mesh="interface" name="interface_col"/>
+                  <joint name="joint6" pos="0 0 0" axis="0 0 1" limited="true" range="-3.4906 3.4906" damping="0.001" frictionloss="0.01"/>
+                </body>
+                <!-- interface -->
+              </body>
+              <!-- wrist -->
+            </body>
+            <!-- forarm -->
+          </body>
+          <!-- elbow -->
+        </body>
+        <!-- upperarm -->
+      </body>
+      <!-- shoulder -->
+    </body>
+    <!-- base -->
+  </worldbody>
+  <actuator>
+    <motor ctrllimited="true" ctrlrange="-150 150" joint="joint1" name="torq_j1"/>
+    <motor ctrllimited="true" ctrlrange="-150 150" joint="joint2" name="torq_j2"/>
+    <motor ctrllimited="true" ctrlrange="-150 150" joint="joint3" name="torq_j3"/>
+    <motor ctrllimited="true" ctrlrange="-150 150" joint="joint4" name="torq_j4"/>
+    <motor ctrllimited="true" ctrlrange="-150 150" joint="joint5" name="torq_j5"/>
+    <motor ctrllimited="true" ctrlrange="-150 150" joint="joint6" name="torq_j6"/>
+  </actuator>
+</mujoco>

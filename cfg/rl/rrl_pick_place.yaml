@@ -1,0 +1,87 @@
+algorithm: PPO # PPO #SAC
+use_discrete_actions: True
+use_nom_actions: False
+use_skill_actions: [] # additional controllers
+use_recovery_actions: False # False # for cascaded recovery
+use_offline_init: False
+use_nominal_reward_model: False
+norm_reward: False #True
+evaluate_skill_chain: False
+subtask_reset: True
+failure_detection: True
+
+use_monte_carlo_q: False
+use_cql_q: False
+
+hl_horizon: 10 #20
+ll_horizon: 100 #200
+evaluate: True #False
+
+mprims:
+  enable_short_mprims: False
+  steps_per_action: 10
+  enable_rot_actions: True #False
+  enable_grip_actions: False #True
+  enable_stay_in_place_action: False
+  default_gripper_action: [-1, 1] # 1 for closing -1 for opening
+  resolution:
+    trans: 0.02
+    rot: 1.57 #0.523 # 1.05
+  resolution_short:
+    trans: 0.01
+    rot: 0.2615
+
+reward:
+  distance:
+    enabled: False
+  action:
+    enabled: False #True # included in value function
+    #enabled: False
+    coeff: -0.005
+  eef_force:
+    enabled: False #True
+    #enabled: False
+    coeff: -0.00001 #action cost is 0.005
+    thresh: 30 #100
+    hard_thresh: 100
+  contact:
+    enabled: False #True
+    coeff: -1  # 0.01
+    target_geoms: [shelf_wall2]
+    slip_thresh: 0.09
+  potential:
+    enabled: False #True
+    #coeff: 1 #can overpower task reward
+    coeff: 0.1
+  fail_reward: 0 # default 1
+  relax_target_pos: True
+  clutter_rot_max: # 0.5
+
+#PickPlaceBread
+obs_keys: ['object-state', 'robot0_proprio-state']
+
+PPO:
+  params:
+    n_steps: 120 #250 # 6400 # 2560
+    batch_size: 60 #125
+    #debug
+    #n_steps: 64 # 6400 # 2560
+    #batch_size: 32
+    ent_coef: 0.0  # 0.0
+    learning_rate: 3e-4
+    #use_sde: True
+    #sde_sample_freq: -1
+  policy:
+    net_arch:
+        "pi": [256, 256]
+        "vf": [256, 256]
+
+eval:
+  n_eval_episodes: 20
+  #eval_freq: 10000 # 7680 # 5120
+  eval_freq: 600 #750 #2500
+  min_train_timesteps: 1200 #1250 # 10000 # 80000
+
+learn:
+  #n_total_steps: 50_000 #50_000
+  n_total_steps: 500_000

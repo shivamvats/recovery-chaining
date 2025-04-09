@@ -1,0 +1,14 @@
+env_name: PickPlaceBread
+robots: Panda
+has_renderer: False
+has_offscreen_renderer: False
+use_camera_obs: False
+use_object_obs: True
+camera_names: frontview
+camera_heights: 1024
+camera_widths: 1024
+camera_depths: False
+ignore_done: True
+reward_shaping: False
+control_freq: 20
+horizon: 200

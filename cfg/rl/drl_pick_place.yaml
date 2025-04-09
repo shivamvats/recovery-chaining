@@ -1,0 +1,146 @@
+algorithm: PPO # PPOTermQ #SAC
+use_discrete_actions: True
+use_nom_actions: 'all' # True
+use_skill_actions: [] # additional controllers
+use_recovery_actions: False # False # for cascaded recovery
+use_offline_init: True
+use_nominal_reward_model: False
+evaluate: False
+norm_reward: False
+
+hl_horizon: 10 #20   #10 15
+ll_horizon: 100 #200
+
+mprims:
+  enable_short_mprims: False
+  steps_per_action: 10
+  enable_rot_actions: True #False
+  enable_grip_actions: False #True
+  default_gripper_action: 0 # 1 for closing -1 for opening
+  resolution:
+    trans: 0.02
+    rot: 1.57 #0.523 # 1.05
+  resolution_short:
+    trans: 0.01
+    rot: 0.2615
+
+skill_actions:
+  skill1:
+    path_to_policy: data/shelf/19-Aug/rl_model_1.zip
+    path_to_vnorm: data/shelf/19-Aug/rl_model_vecnormalize_1.pkl
+
+reward:
+  distance:
+    enabled: False
+  action:
+    enabled: False #True # included in value function
+    #enabled: False
+    coeff: -0.005
+  eef_force:
+    enabled: False #True
+    #enabled: False
+    coeff: -0.00001 #action cost is 0.005
+    thresh: 30 #100
+    hard_thresh: 100
+  contact:
+    enabled: False #True
+    coeff: -1  # 0.01
+    target_geoms: [shelf_wall2]
+    slip_thresh: 0.09
+  potential:
+    enabled: False #True
+    #coeff: 1 #can overpower task reward
+    coeff: 0.1
+  fail_reward: 0 # default 1
+  relax_target_pos: True
+  clutter_rot_max: # 0.5
+
+#PickPlaceBread
+obs_keys: ['object-state', 'robot0_proprio-state']
+
+PPOTermQ:
+  params:
+    # Note: has to be multiple of num_cpus
+    n_steps: 250 #256
+    batch_size: 125 #60 #32 # same as critic #125 #5
+    ent_coef: 0.0  # 0.01
+    learning_rate: 3e-4 #1e-4
+    # 5 epochs = 40 grap updates
+    n_epochs: 10 # because critic is changing
+    clip_range: 0.2
+  actor_freeze_steps: 0 #480
+  update_critic: True
+
+  critic:
+    algo: ddqn # cql
+    lr: 3e-4
+    replay_buffer_size: 10000000
+    batch_size: 32 # 64
+    # -n implies  n x  #new transitions
+    init: True
+    init_n_steps: -1
+    n_steps: -0.5 #-1 #2_000 #6_000
+    n_steps_per_epoch: -1 #1_000
+    n_critics: 3 #1
+    start_buffer_size: -1 #500
+    target_update_interval: 500
+    gamma: 0.99
+    cql_alpha: 0.5 #1.0
+    n_nominal_rollouts: 10 #200
+    nominal_rollout_ratio: 2
+    critic_update_freq: 1 # 1000
+    clip_critic: False
+    critic_clip_range: [-1.5, 1.5]
+    reset_nominal_buffer_online: True #True
+    drop_last_obs: True
+    ignore_intra_option_states: False
+    privileged_critic: False
+    n_cpus_rollout: -1
+
+    obs_keys: ['object-state', 'robot0_proprio-state']
+
+  policy:
+    net_arch:
+        "pi": [256, 256]
+        "vf": [256, 256]
+
+PPO:
+  params:
+    n_steps: 120 #250 # 6400 # 2560
+    batch_size: 60 #125
+    #debug
+    #n_steps: 64 # 6400 # 2560
+    #batch_size: 32
+    ent_coef: 0.0  # 0.0
+    learning_rate: 3e-4
+    #use_sde: True
+    #sde_sample_freq: -1
+  policy:
+    net_arch:
+        "pi": [256, 256]
+        "vf": [256, 256]
+
+SAC:
+  params:
+    learning_starts: 2560
+    batch_size: 256
+    learning_rate: 3e-4
+    train_freq: 2560 # 256
+    gradient_steps: -1
+    use_sde: True
+    sde_sample_freq: -1
+
+  policy:
+    net_arch:
+      "pi": [256, 256]
+      "qf": [256, 256]
+
+eval:
+  n_eval_episodes: 20
+  #eval_freq: 10000 # 7680 # 5120
+  eval_freq: 600 #750 #2500
+  min_train_timesteps: 1200 #1250 # 10000 # 80000
+
+learn:
+  #n_total_steps: 50_000 #50_000
+  n_total_steps: 500_000

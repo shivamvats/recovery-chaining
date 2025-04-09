@@ -1,0 +1,260 @@
+defaults:
+
+  #- rl: drl
+  #- env: shelf #task
+  #- rl: drl_shelf
+
+  #- env: pick_place
+  #- rl: drl_pick_place
+
+  - env: pick_place #shelf_clutter
+  - rl: rc_pick_place #rc_shelf_clutter
+
+  - ctrl: osc_pose
+  #- override hydra/launcher: joblib
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+hydra:
+  job:
+    chdir: True
+  run:
+    dir: ${output_dir}/${now:%Y-%m-%d}/${seed}_${now:%H-%M-%S}:${tag}
+  sweep:
+    dir: ./outputs/${now:%Y-%m-%d}/${seed}_${now:%H-%M-%S}:${tag}
+    subdir: ${hydra.job.num}
+
+output_dir: ./outputs
+seed: 92
+tag: ''
+#group: rss_${env.env_name}
+group: rss_rebuttal
+comment:
+
+#task: ShelfEnv #PlaceAtEdge #Stack
+nevals: 100
+render: False
+use_ray: False
+use_wandb: True
+num_cpus: 10
+num_gpus: 1
+device: cuda #gpu
+
+# PlaceAtEdge
+#data_dir: data/place/28-Jul-cuboid
+
+# ShelfEnv
+#data_dir: data/shelf/25-Aug-no-clutter
+#data_dir: data/shelf/25-Aug-clutter
+
+# post 21-Dec
+#data_dir: /home/aries/research/belief_srs/data/shelf/21-Dec/with_clutter
+#data_dir: /home/aries/research/belief_srs/data/shelf/22-Dec/relative_pos
+#
+# Shelf
+# option-time
+shelf_data_dir: /home/svats2/research/belief_srs/data/shelf/31-Jan
+
+# pick-place
+# for all rl methods
+pick_place_data_dir: /home/svats2/research/belief_srs/data/pick_place/31-Jan
+# for bc
+pick_place_bc_data_dir: /home/svats2/research/belief_srs/data/pick_place/19-Apr
+
+pick_data_dir: /home/svats2/research/belief_srs/data/pick/10-Apr
+
+shelf_clutter_data_dir: /home/svats2/research/belief_srs/data/shelf_clutter/15-Apr
+
+door_data_dir: /home/svats2/research/belief_srs/data/door/28-Feb
+
+data_dir: ''
+
+failures:
+  learn: False
+  nfails: 100  #500
+  max_evals: 500
+  fail_filename: failures.pkl
+  demo_filename: demos.pkl
+  viz: False
+  record: False
+  record_nominal_traj: False
+  render: False
+  debug: False
+
+# deprecated
+clusters:
+  learn: True # cheap to cluster
+  filename: fail_clusters.pkl
+  viz: False
+  nclusters: 1
+  cluster_by: None #stage # "state+fail_type"
+
+recoveries:
+  learn: False
+  warmstart: False
+  filename: recoveries.pkl
+  viz: False
+  render: False
+  goal: task_goal # subgoal
+  clusters:
+    - [1]
+    #- [missed_obj, 0]
+    #- [collision, 1]
+    #- [slip, 1]
+
+bc:
+  learn: False
+  iterations: 1
+
+evaluate:
+  method: recovery
+  #nevals: 100
+  evaluate_recovery: False
+  evaluate_policy: False
+  evaluate_chain: False
+  robust_evaluate: False
+  n_robust_evaluations: 10
+  record_video: False #during evaluation
+  viz_preconds: False
+
+  algo: rc
+  env_name: pick_place
+  #policy_run_path:
+  #path_to_policy: best_model.zip
+  #path_to_vnorm: best_vecnorm.pkl
+
+  path_to_policy: results/rss/pick/rc/skills/52_17-43-03:rc_pick_52/policies/best_model.zip
+  path_to_vnorm: results/rss/pick/rc/skills/52_17-43-03:rc_pick_52/policies/best_vecnorm.pkl
+
+
+  #path_to_policy: /home/aries/research/belief_srs/results/rss/pick_place/rc/skills/102_10-18-19:rc_hl_10/policies/best_model.zip
+  #path_to_vnorm: /home/aries/research/belief_srs/results/rss/pick_place/rc/skills/102_10-18-19:rc_hl_10/policies/best_vecnorm.pkl
+
+  # cascaded policy
+  #path_to_policy: outputs/2023-12-02/09-58-01:horizon_20_pot_coeff_01/policies/rl_model_162500_steps.zip
+  #path_to_vnorm: outputs/2023-12-02/09-58-01:horizon_20_pot_coeff_01/policies/rl_model_vecnormalize_162500_steps.pkl
+
+  # first recovery
+  #path_to_policy: outputs/2023-11-29/20-34-25:new_value_fn_recovery/policies/rl_model_100000_steps.zip
+  #path_to_vnorm: outputs/2023-11-29/20-34-25:new_value_fn_recovery/policies/rl_model_vecnormalize_100000_steps.pkl
+
+  #ICRA
+  #=======
+  # no clutter
+  #path_to_policy: data/shelf/icra/without_clutter/policies_vf/rl_model_slip.zip
+  #path_to_vnorm: data/shelf/icra/without_clutter/policies_vf/vecnorm_slip.pkl
+
+  # clutter
+  #path_to_policy: data/shelf/icra/with_clutter/policies_cascaded/policy_0.zip
+  #path_to_vnorm: data/shelf/icra/with_clutter/policies_cascaded/vecnorm_0.pkl
+
+value_fn:
+  learn: False
+  q_value: True
+  ignore_intra_option_states: False
+  model_filename: ${data_dir}/value_fn.pt
+  scaler_filename: ${data_dir}/value_fn_scaler.pkl
+  monte_carlo: True
+  td_steps: 1
+  num_epochs: 500
+  lr: 3e-4
+  batch_size: 64
+  # for binary classification
+  discount: 1.0
+  #discount: 0.99
+  obs_keys: ['object-state', 'robot0_proprio-state']
+  # PickPlace
+  pick_place_obs_keys: ['object-state', 'robot0_proprio-state']
+
+  # cluttered shelf
+
+  # shelf
+  #obs_keys: [
+      #"robot0_eef_pos", "robot0_eef_quat",
+      #"robot0_gripper_qpos", "box_dims", "box_pos",
+      #"target_pos", "collision"
+    #]
+
+  #privileged info
+  # shelf
+  shelf_obs_keys: [
+    "robot0_eef_rpy", "robot0_gripper_pos",
+    "robot_grasping_box", "robot_touching_box", "collision", "obj_contacts",
+    "box_rpy", "box_dims",
+    "shelf_dims",
+    "robot0_eef_to_box", "robot0_eef_to_shelf",
+    "robot0_eef_pos",
+    "box_pos",
+    "shelf_pos",
+  ]
+
+  # cluttered-shelf
+  cluttered_shelf_obs_keys: [
+    "robot0_eef_rpy", "robot0_gripper_pos",
+    "robot_grasping_box", "robot_touching_box", "collision", "obj_contacts",
+    "box_rpy", "box_dims",
+    "shelf_dims",
+    "robot0_eef_to_box", "robot0_eef_to_shelf",
+    "robot0_eef_pos",
+    "box_pos",
+    "shelf_pos",
+    "clutter0_pos", "clutter0_rpy",
+    "clutter1_pos", "clutter1_rpy",
+  ]
+q_value:
+  learn: False
+  algo: double_dqn # cql
+  ignore_intra_option_states: False
+  cql_alpha: 1.0
+  cql_n_critics: 2
+  cql_bound_q_point_wise: False
+  cql_hidden_units: [256, 256]
+  dqn_n_critics: 5
+  fqe: False #False
+  privileged_critic: False #True
+  #model_filename: ${data_dir}/q_value_fn.pt
+  model_filename:
+  #model_run_path: iam-lab/merl_hrl/100nfb16
+  model_run_path: iam-lab/merl_hrl/oz9eah7v
+  algo_n_steps: 50_000 #1_000_000 #400_000 # CQL paper used 1M
+  algo_n_steps_per_epoch: 5_000
+  n_steps: 500_000
+  n_steps_per_epoch: 10_000
+  target_update_interval: 2000
+  lr: 3e-4
+  batch_size: 32
+  gamma: 0.99
+  drop_last_obs: True
+
+  # Shelf
+  #obs_keys: [
+    #"robot0_eef_rpy", "robot0_gripper_pos", "robot0_eef_forces",
+    #"robot_grasping_box", "robot_touching_box", "collision", "obj_contacts",
+    #"box_rpy", "box_dims",
+    #"shelf_dims",
+    #"clutter0_rpy",
+    #"option_time",
+    ## relative positions in eef frame
+    ## ------
+    ## for better generalization and
+    ## to ensure doesn't overfit to global pos
+    #"robot0_eef_to_box", "robot0_eef_toclutter0", "robot0_eef_to_shelf", "clutter0_to_box",
+    ## global positions
+    ## #----
+    ##"robot0_eef_pos",
+    ##"box_pos",
+    ##"shelf_pos",
+    ##"clutter0_pos",
+  #]
+
+  # PickPlace
+  obs_keys: ['object-state', 'robot0_proprio-state']
+
+
+cascaded:
+  learn: False
+  n_cascades: 2
+  precond_thresh: 0.8
+  warmstart_fails: False # load unsolved fails from file
+  unsolved_fails_filename: unsolved_fails.pkl
+

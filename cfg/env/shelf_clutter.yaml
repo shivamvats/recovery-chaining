@@ -1,0 +1,22 @@
+env_name: ShelfEnv
+#robots: MELFA
+#gripper_types: SchunkGripper
+robots: Panda
+has_renderer: False
+has_offscreen_renderer: False
+use_camera_obs: False
+camera_names: frontview
+camera_heights: 1024
+camera_widths: 1024
+camera_depths: False
+ignore_done: True
+reward_shaping: False
+control_freq: 20
+horizon: 200
+
+task_dist:
+  box_density: [200, 300] # range
+  shelf_height: [0.21, 0.3]
+  clutter:
+    enable: True
+    n_clutter: 2
