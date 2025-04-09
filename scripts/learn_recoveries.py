@@ -16,10 +16,8 @@ from autolab_core import RigidTransform as RT
 from belief_srs.envs.discrete_action_wrapper import DiscreteActionWrapper
 from belief_srs.envs.improved_gym_wrapper import ImprovedGymWrapper
 from belief_srs.envs.pick_env import PickBread
-from belief_srs.envs.shelf_env_real import ShelfEnvReal
 from belief_srs.envs.subtask_wrapper import SubtaskWrapper, reset_env
 from belief_srs.envs.time_wrapper import TimeWrapper
-from belief_srs.skills.block_recovery_skill import BlockRecoverySkill
 from belief_srs.skills.nominal_skills import *
 from belief_srs.skills.recovery_skill import RecoverySkillDRL
 from belief_srs.skills.skill_chain import SkillChain
@@ -29,7 +27,6 @@ from hydra.utils import *
 from omegaconf import OmegaConf
 from PIL import Image
 from robosuite.controllers import load_controller_config
-from robosuite.wrappers.visualization_wrapper import VisualizationWrapper
 from sklearn.model_selection import train_test_split
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import (DummyVecEnv, VecNormalize,
@@ -38,18 +35,10 @@ from tqdm import tqdm
 
 sns.set()
 
-# os.environ["WANDB_START_METHOD"] = "thread"
-
-# import ray
-
-# import d3rlpy as d3
-
-# neural net
-
 
 logger = logging.getLogger(__name__)
-logger.setLevel("INFO")
-# logger.setLevel("DEBUG")
+# logger.setLevel("INFO")
+logger.setLevel("DEBUG")
 
 device = torch.device("cpu")
 
@@ -128,13 +117,6 @@ def make_env(cfg, env_cfg="default", test=False):
         env = PickFailureDetector(
             env, cfg, failure_detection=failure_detection)
 
-    elif cfg.env.env_name == "Door":
-        from belief_srs.envs.failure_detector_wrapper import \
-            DoorFailureDetector
-
-        failure_detection = cfg.rl.get("failure_detection", True)
-        env = DoorFailureDetector(
-            env, cfg, failure_detection=failure_detection)
 
     return env
 
@@ -338,12 +320,6 @@ def get_nominal_skills(task="Stack"):
         from belief_srs.skills.door_nominal_skills import (
             PullHandleSkill, ReachAndGraspHandleSkill, RotateHandleSkill)
 
-        # class skill():
-            # def apply(self, env, *args, **kwargs):
-                # for _ in range(100):
-                    # env.render()
-        # skill = skill()
-
         goto_skill = ReachAndGraspHandleSkill()
         rotate_skill = RotateHandleSkill()
         pull_skill = PullHandleSkill()
@@ -352,7 +328,6 @@ def get_nominal_skills(task="Stack"):
         return goto_skill, pull_skill
 
     elif task == "PickBread":
-        # goto_grasp_skill = GotoGraspSkill(target="Bread")
         pickup_skill = SinglePickupSkill(target="Bread")
 
         return (pickup_skill,)
@@ -364,165 +339,42 @@ def get_nominal_skills(task="Stack"):
 def collect_failures(env, skills, cfg):
     env = TimeWrapper(env)
 
-    if cfg.env.env_name == "PlaceAtEdge":
-        pick_skill, place_skill = skills
-        rews = []
-        n_fails = 0
-        pbar = tqdm(total=cfg.failures.nfails)
-        while n_fails < cfg.failures.nfails:
-            obs = env.reset()
-            obs, rew, done, info = pick_skill.apply(
-                env, obs, render=cfg.render)
-            # env.monitor_failure = True
-            obs, rew, done, info = place_skill.apply(
-                env, obs, render=cfg.render)
-            # env.monitor_failure = False
-            if len(env.failures) > n_fails:
-                pbar.update(len(env.failures) - n_fails)
-                n_fails = len(env.failures)
+    succs, rews = [], []
+    n_fails, n_trans = 0, 0
+    pbar = tqdm(total=cfg.failures.nfails)
+    failures, demos = [], []
+    while n_fails < cfg.failures.nfails and len(succs) < cfg.failures.max_evals:
+        logger.info(f"  n_fails: {n_fails}, n_executions: {len(demos)}")
+        total_rew = 0
+        obs = env.reset()
+        traj = {"state": [], "reward": [], "action": [], "ll_action": []}
+        traj["state"].append(env.observe_true_state(mj_state=False))
+        for skill in skills:
+            # logger.info(f"  executing {skill}")
+            obs, rew, done, info = skill.apply(env, obs, render=cfg.render)
+            total_rew += rew
+            traj["state"].extend(info["hist"]["state"])
+            traj["reward"].extend(info["hist"]["reward"])
+            traj["action"].extend(info["hist"]["skill"])
+            if "action" in info["hist"]:
+                traj["ll_action"].extend(info["hist"]["action"])
+            if done:
+                break
 
-            logger.debug(f"Success: {env._check_success()}")
-            logger.debug(f"Reward: {rew}")
-            rews.append(rew)
-        pbar.close()
+        is_failure = info["is_failure"]
+        demos.append(traj)
+        n_trans += len(traj["reward"])
+        if is_failure:
+            failures.append(info["state"])
+            n_fails += 1
+        success = total_rew > 0
 
-    else:
-        succs, rews = [], []
-        n_fails, n_trans = 0, 0
-        pbar = tqdm(total=cfg.failures.nfails)
-        failures, demos = [], []
-        while n_fails < cfg.failures.nfails and len(succs) < cfg.failures.max_evals:
-            logger.info(f"  n_fails: {n_fails}, n_executions: {len(demos)}")
-            total_rew = 0
-            obs = env.reset()
-            traj = {"state": [], "reward": [], "action": [], "ll_action": []}
-            traj["state"].append(env.observe_true_state(mj_state=False))
-            for skill in skills:
-                # logger.info(f"  executing {skill}")
-                obs, rew, done, info = skill.apply(env, obs, render=cfg.render)
-                total_rew += rew
-                traj["state"].extend(info["hist"]["state"])
-                traj["reward"].extend(info["hist"]["reward"])
-                traj["action"].extend(info["hist"]["skill"])
-                if "action" in info["hist"]:
-                    traj["ll_action"].extend(info["hist"]["action"])
-                if done:
-                    break
-
-            is_failure = info["is_failure"]
-            demos.append(traj)
-            n_trans += len(traj["reward"])
-            if is_failure:
-                failures.append(info["state"])
-                n_fails += 1
-            success = total_rew > 0
-
-            logger.info(
-                f"Success: {success}, term: {is_failure}, total reward: {total_rew}, traj_len: {len(traj['reward'])}, #transitions: {n_trans}"
-            )
-            rews.append(rew)
-            succs.append(success)
-        pbar.close()
-
-    # elif cfg.env.env_name == "ShelfEnvOld":
-    # # env = VisualizationWrapper(env, indicator_configs=INDICATOR_SITE_CONFIG)
-    # # pick_skill, goto_skill, place_skill = skills
-
-    # succs, rews = [], []
-    # n_fails = 0
-    # pbar = tqdm(total=cfg.failures.nfails)
-    # demos = []
-    # failures = []
-    # while n_fails < cfg.failures.nfails and len(succs) < cfg.failures.max_evals:
-    # print(f"n_fails: {n_fails}, trajs: {len(demos)}")
-    # total_rew = 0
-    # traj = {"state": [], "reward": [], "action": []}
-
-    # obs = env.reset()
-    # # false positives on collision during pickup
-    # # let objects settle
-    # for _ in range(5):
-    # env.sim.forward()
-    # env.sim.step()
-    # if cfg.render:
-    # env.render()
-
-    # env.monitor_failure = {"collision": False, "slip": True, "missed_obj": True}
-    # env.set_stage(0)
-    # true_state = env.observe_true_state(mj_state=True)
-    # true_state["option_time"] = np.array([0])
-    # traj["state"].append(true_state)
-    # # traj["state"].append(env.observe_true_state(mj_state=True))
-    # eef_start = obs["robot0_eef_pos"]
-    # obs, rew, done, info = pick_skill.apply(env, obs, render=cfg.render)
-    # eef_end = obs["robot0_eef_pos"]
-    # total_rew += rew
-    # traj["state"].extend(info["hist"]["state"])
-    # traj["reward"].extend(info["hist"]["reward"])
-    # traj["action"].extend(
-    # env.stage * np.ones(len(info["hist"]["reward"]), dtype=int)
-    # )
-
-    # if not done:
-    # # env.monitor_failure = {
-    # # "collision": True,
-    # # "slip": True,
-    # # "missed_obj": False,
-    # # }
-    # env.set_stage(1)
-    # eef_start = eef_end
-    # obs, rew, done, info = goto_skill.apply(env, obs, render=cfg.render)
-    # eef_end = obs["robot0_eef_pos"]
-    # total_rew += rew
-    # traj["state"].extend(info["hist"]["state"])
-    # traj["reward"].extend(info["hist"]["reward"])
-    # traj["action"].extend(
-    # env.stage * np.ones(len(info["hist"]["reward"]), dtype=int)
-    # )
-
-    # if not done:
-    # env.monitor_failure = {
-    # "collision": True,
-    # "slip": True,
-    # "missed_obj": False,
-    # }
-    # env.set_stage(2)
-    # obs, rew, done, info = place_skill.apply(env, obs, render=cfg.render)
-    # eef_end = obs["robot0_eef_pos"]
-    # total_rew += rew
-    # traj["state"].extend(info["hist"]["state"])
-    # traj["reward"].extend(info["hist"]["reward"])
-    # traj["action"].extend(
-    # env.stage * np.ones(len(info["hist"]["reward"]), dtype=int)
-    # )
-
-    # if env._check_terminated():
-    # # pbar.update(len(env.failures) - n_fails)
-    # failure = env.failure
-    # # traj state has option_time
-    # failure["state"] = deepcopy(traj["state"][-1])
-    # failures.append(failure)
-    # n_fails += 1
-
-    # success = env._check_success()
-    # demos.append(traj)
-
-    # print(
-    # f"Success: {success}, term: {env._check_terminated()} total reward: {total_rew}"
-    # )
-    # rews.append(rew)
-    # succs.append(success)
-    # if cfg.failures.debug:
-    # plt.plot(np.max(failures, axis=1))
-    # plt.title("EEF Forces")
-    # plt.show()
-    # pbar.close()
-
-    # train_fails, test_fails = train_test_split(failures, shuffle=True, test_size=0.2)
-    # fails = {
-    # "train": train_fails,
-    # "test": test_fails,
-    # }
+        logger.info(
+            f"Success: {success}, term: {is_failure}, total reward: {total_rew}, traj_len: {len(traj['reward'])}, #transitions: {n_trans}"
+        )
+        rews.append(rew)
+        succs.append(success)
+    pbar.close()
 
     pkl_dump(failures, "failures.pkl")
     pkl_dump(demos, "demos.pkl")
@@ -547,300 +399,12 @@ def load_value_fn(cfg, device="cpu"):
         value_fn = NominalValueFunction(cfg, device)
         value_fn.load(cfg.model_filename, cfg.scaler_filename)
     except:
-        # value_fn = d3.algos.CQLConfig().create()
-        # value_fn.build_with_dataset()
-        # value_fn.load_model(cfg.q_value.model_filename)
         pass
 
     return value_fn
 
 
-def fit_nominal_q_value(trajs, cfg):
-    from belief_srs.utils.utils import d3_dataset_from_trajs
-
-    def _train_test_split(trajs):
-        (
-            train_states,
-            test_states,
-            train_actions,
-            test_actions,
-            train_rewards,
-            test_rewards,
-        ) = train_test_split(
-            [traj["state"] for traj in trajs],
-            [traj["action"] for traj in trajs],
-            [traj["reward"] for traj in trajs],
-            test_size=0.05,
-            shuffle=True,
-            random_state=42,
-        )
-        logger.info("Train dataset")
-        train_dataset = d3_dataset_from_trajs(
-            [
-                dict(state=states, action=actions, reward=rewards)
-                for states, actions, rewards in zip(
-                    train_states, train_actions, train_rewards
-                )
-            ],
-            cfg,
-        )
-        logger.info("Test dataset")
-        test_dataset = d3_dataset_from_trajs(
-            [
-                dict(state=states, action=actions, reward=rewards)
-                for states, actions, rewards in zip(
-                    test_states, test_actions, test_rewards
-                )
-            ],
-            cfg,
-        )
-        return train_dataset, test_dataset
-
-    def plot_error(algo, episodes, per_action_color=False):
-        fig, ax = plt.subplots()
-        ax.set_title(f"Epoch: {epoch} err = Q - return")
-        if cfg.cql_bound_q_point_wise:
-            ax.set_ylim(-6, 2)
-        else:
-            ax.set_ylim(-3, 2)
-        # matplotlib axis set ylim
-        # get a cycle of matplotlib colors
-        colors = list(mcolors.TABLEAU_COLORS)
-        for ep_id, ep in enumerate(episodes):
-            rews = ep.rewards
-            returns = np.cumsum(rews[::-1])[::-1]
-            preds = algo.predict_value(ep.observations, ep.actions)
-            nactions = np.unique(ep.actions).shape[0]
-            ax.plot([0, len(preds)], [0, 0], color="k")
-            if per_action_color:
-                for action, l in zip(range(nactions), ["dotted", "solid", "dashed"]):
-                    idx = np.where(ep.actions == action)[0]
-                    ax.plot(
-                        idx,
-                        preds[idx] - returns[idx],
-                        color=colors[ep_id],
-                        linestyle=l,
-                    )
-            else:
-                ax.plot(
-                    preds - returns,
-                    color=colors[ep_id],
-                )
-        return wandb.Image(fig)
-
-    train_dataset, test_dataset = _train_test_split(trajs)
-    # train_dataset, env = d3.datasets.get_dataset("antmaze-medium-diverse-v0")
-    # test_dataset = train_dataset
-    # logger.info("Testing cartpole")
-
-    logger.info("  train dataset size: {}".format(
-        train_dataset.transition_count))
-    logger.info("  test dataset size: {}".format(
-        test_dataset.transition_count))
-
-    # dobule dqn is better than dqn
-    if cfg.algo == "dqn":
-        algo = d3.algos.DQNConfig(
-            observation_scaler=d3.preprocessing.StandardObservationScaler()
-        ).create(device="cuda:0")
-
-    elif cfg.algo == "double_dqn":
-        algo = d3.algos.DoubleDQNConfig(
-            learning_rate=cfg.lr,
-            batch_size=cfg.batch_size,
-            target_update_interval=cfg.target_update_interval,
-            n_critics=cfg.dqn_n_critics,
-            # encoder_factory=VectorEncoderFactory(hidden_units=cfg.ddqn_hidden_units),
-            observation_scaler=d3.preprocessing.StandardObservationScaler(),
-            # reward_scaler=d3.preprocessing.MinMaxRewardScaler,
-        ).create(device="cuda:0")
-
-    elif cfg.algo == "cql":
-        from d3rlpy.models.encoders import VectorEncoderFactory
-
-        algo = d3.algos.DiscreteCQLConfig(
-            alpha=cfg.cql_alpha,
-            learning_rate=cfg.lr,
-            batch_size=cfg.batch_size,
-            target_update_interval=cfg.target_update_interval,
-            n_critics=cfg.cql_n_critics,
-            encoder_factory=VectorEncoderFactory(
-                hidden_units=cfg.cql_hidden_units),
-            bound_q_point_wise=cfg.cql_bound_q_point_wise,
-            observation_scaler=d3.preprocessing.StandardObservationScaler(),
-        ).create(device="cuda:0")
-    else:
-        raise NotImplementedError
-
-    from belief_srs.utils.utils import (ImprovedTDErrorEvaluator,
-                                        ReturnErrorEvaluator)
-
-    value_clip_range = (-3, 1)
-
-    for epoch, metrics in algo.fitter(
-        train_dataset,
-        n_steps=cfg.algo_n_steps,
-        n_steps_per_epoch=cfg.algo_n_steps_per_epoch,
-        evaluators={
-            "test_td_error": ImprovedTDErrorEvaluator(
-                test_dataset.episodes, value_clip_range=value_clip_range
-            ),
-            "train_td_error": ImprovedTDErrorEvaluator(
-                value_clip_range=value_clip_range
-            ),
-            "monte_carlo_error": ReturnErrorEvaluator(test_dataset.episodes),
-            "value_mean": d3.metrics.AverageValueEstimationEvaluator(
-                test_dataset.episodes
-            ),
-            "init_value": d3.metrics.InitialStateValueEstimationEvaluator(
-                test_dataset.episodes
-            ),
-        },
-        logger_adapter=d3.logging.TensorboardAdapterFactory(root_dir="."),
-        with_timestamp=False,
-    ):
-        # eval
-        import matplotlib.colors as mcolors
-
-        wandb.run.log(
-            {
-                f"q_value_train": plot_error(algo, train_dataset.episodes[:10]),
-                f"q_value_test": plot_error(algo, test_dataset.episodes[:10]),
-            }
-        )
-        algo.save("q_value.d3")
-        wandb.save("q_value.d3")
-
-    if cfg.fqe:
-        fqe_config = d3.ope.FQEConfig(
-            learning_rate=cfg.lr,
-            batch_size=cfg.batch_size,
-            gamma=cfg.gamma,
-            target_update_interval=cfg.target_update_interval,
-            observation_scaler=d3.preprocessing.StandardObservationScaler(),
-            # reward_scaler=d3.preprocessing.MinMaxRewardScaler(),
-        )
-        fqe = d3.ope.DiscreteFQE(
-            algo=algo,
-            config=fqe_config,
-            device="cuda:0",
-        )
-
-        # start FQE training
-        for epoch, metrics in fqe.fitter(
-            train_dataset,
-            n_steps=cfg.n_steps,
-            n_steps_per_epoch=cfg.n_steps_per_epoch,
-            evaluators={
-                "fqe_td_error": d3.metrics.TDErrorEvaluator(test_dataset.episodes),
-                "fqe_value_mean": d3.metrics.AverageValueEstimationEvaluator(
-                    test_dataset.episodes
-                ),
-                "fqe_monte_carlo_error": ReturnErrorEvaluator(test_dataset.episodes),
-                "fqe_init_value": d3.metrics.InitialStateValueEstimationEvaluator(
-                    test_dataset.episodes
-                ),
-            },
-            logger_adapter=d3.logging.TensorboardAdapterFactory(root_dir="."),
-            experiment_name="fqe",
-            with_timestamp=False,
-        ):
-            fqe.save("q_fqe.d3")
-            wandb.save("q_fqe.d3")
-
-            # eval
-            wandb.run.log(
-                {
-                    f"fqe_value_train": plot_error(fqe, train_dataset.episodes[:10]),
-                    f"fqe_value_test": plot_error(fqe, test_dataset.episodes[:10]),
-                }
-            )
-
-
-def get_state_transformer(cfg):
-    if cfg.env.env_name == "PlaceAtEdge":
-
-        def state_transformer(obsx):
-            """
-            Transforms a state dict into an array for fitting classifier.
-            """
-            rel_keys = [
-                "cube_pos",
-                "cube_mat",
-                "robot0_eef_pos",
-                "robot0_eef_mat",
-                "robot0_gripper_pos",
-            ]
-            X = []
-            for obs in obsx:
-                T_cube = RT(translation=obs["cube_pos"],
-                            rotation=obs["cube_mat"])
-                T_eef = RT(
-                    translation=obs["robot0_eef_pos"], rotation=obs["robot0_eef_mat"]
-                )
-                T_cube_eef = T_eef.inverse() * T_cube
-                x = [
-                    T_cube_eef.translation,
-                    T_cube_eef.euler_angles,
-                    obs["robot0_gripper_pos"],
-                ]
-
-                # x = []
-                # for key in rel_keys:
-                # val = obs[key]
-                # if "mat" in key:
-                # # TODO try the 6D representation:
-                # # quat seems to be more continuous than rpy
-                # # https://zhengyiluo.github.io/assets/pdf/Rotation_DL.pdf
-                # val = T.mat2quat(val)
-                # x.append(val)
-
-                x = np.concatenate(x)
-                X.append(x)
-            X = np.array(X)
-            return X
-
-        return state_transformer
-
-    elif cfg.env.env_name == "ShelfEnv":
-
-        def state_transformer(obsx):
-            """
-            Transforms a state dict into an array for fitting classifier.
-            """
-            rel_keys = [
-                "box_pos",
-                "box_mat",
-                "robot0_eef_pos",
-                "robot0_eef_mat",
-                "robot0_gripper_pos",
-            ]
-            X = []
-            for obs in obsx:
-                T_cube = RT(translation=obs["box_pos"],
-                            rotation=obs["box_mat"])
-                T_eef = RT(
-                    translation=obs["robot0_eef_pos"], rotation=obs["robot0_eef_mat"]
-                )
-                T_cube_eef = T_eef.inverse() * T_cube
-                x = [
-                    T_cube_eef.translation,
-                    T_cube_eef.euler_angles,
-                    obs["robot0_gripper_pos"],
-                ]
-
-                x = np.concatenate(x)
-                X.append(x)
-            X = np.array(X)
-            return X
-
-        return state_transformer
-
-
 def cluster_failures(fails, cfg):
-    # state_transformer = get_state_transformer(cfg)
-    # X = state_transformer(states)
-
     fail_types = ["collision", "slip", "collision-slip", "missed_obj"]
     stages = [0, 1, 2]
 
@@ -944,183 +508,6 @@ def learn_recoveries(init_failures, cfg, warmstart=None):
             recovery.train_policy(
                 lambda: env_fn(cfg, "human", test=False),
                 lambda: env_fn(cfg, "rgb_array", test=True),
-            )
-            recoveries.append(recovery)
-
-        pkl_dump(recoveries, "recoveries.pkl")
-
-    return recoveries
-
-
-def learn_bc_policy(demos, cfg, iterations=1, expert_policy=None):
-    from imitation.algorithms import bc
-    from imitation.data.types import Trajectory
-    from imitation.policies.base import NormalizeFeaturesExtractor
-    from sklearn import preprocessing
-    from stable_baselines3.common import policies
-    from stable_baselines3.common.evaluation import evaluate_policy
-    from stable_baselines3.common.torch_layers import FlattenExtractor
-
-    rng = np.random.default_rng(cfg.seed)
-
-    # train base policy using demos
-    base_env = make_env(cfg)
-    env = wrap_env(
-        base_env,
-        cfg,
-        start_states=[],
-        subgoal=None,
-        cluster_key="",
-        render_mode="human" if cfg.render else "rgb_array",
-        test=False,
-    )
-    env = DummyVecEnv([lambda: env])
-    # env = VecNormalize(
-    # DummyVecEnv([lambda: env]), training=True, norm_obs=True, norm_reward=False
-    # )
-
-    data = []
-    for demo in demos:
-        n_actions = len(demo["ll_action"])
-        if demo["reward"][-1] > 0:
-            traj = Trajectory(
-                obs=np.array(
-                    [env.envs[0]._flatten_obs(state["obs"])
-                     for state in demo["state"]]
-                ),
-                acts=np.array(demo["ll_action"]),
-                infos=[{} for _ in range(n_actions)],
-                terminal=True,
-            )
-            data.append(traj)
-
-    all_obs = np.concatenate([traj.obs for traj in data])
-    # env.obs_rms.update(all_obs)
-
-    network = policies.ActorCriticPolicy(
-        observation_space=env.observation_space,
-        action_space=env.action_space,
-        net_arch=[128, 128],
-        lr_schedule=lambda _: torch.finfo(torch.float32).max,
-        features_extractor_class=NormalizeFeaturesExtractor,
-        # features_extractor_class=FlattenExtractor,
-    )
-
-    bc_trainer = bc.BC(
-        observation_space=env.observation_space,
-        action_space=env.action_space,
-        demonstrations=data,
-        policy=network,
-        rng=rng,
-        device="cpu",
-    )
-    for _ in range(5):
-        env.training = True
-        bc_trainer.train(n_epochs=10)
-        env.training = False
-        reward, _ = evaluate_policy(bc_trainer.policy, env, 10)
-        print("Reward:", reward)
-    __import__("ipdb").set_trace()
-
-    # policy = BC(demos, cfg)
-
-
-def get_expert_policy(env_name):
-    if env_name == "PickPlaceBread":
-        policy = None
-    elif env_name == "ShelfEnv":
-        policy = None
-
-    return policy
-
-
-def learn_cascaded_recoveries(clusters, cfg, warmstart=None):
-    recoveries = []
-
-    for key in cfg.recoveries.clusters:
-        key = tuple(key)
-        fail_cluster = clusters[key]
-        # fail_cluster = clusters[key][:1]
-        cluster = [fail["state"] for fail in fail_cluster]
-
-        if cfg.env.env_name == "PlaceAtEdge":
-            params = np.array([0.0, -0.02, 0.0, 1])
-            recovery = BlockRecoverySkill(params)
-
-            def train_env_fn():
-                env = make_env(cfg)
-                env = SubtaskWrapper(env, start_states=cluster, subgoal=None)
-                return env
-
-            recovery.train_policy(train_env_fn, train_env_fn, cfg)
-            recoveries.append(recovery)
-
-        elif cfg.env.env_name == "ShelfEnv" or cfg.env.env_name == "ShelfEnvReal":
-            params = None
-            recovery = RecoverySkillDRL(cfg)
-
-            if cfg.rl.use_recovery_actions:
-                skill_paths = {}
-                for skill_name, skill_path in cfg.rl.use_skill_actions.items():
-                    skill_paths[skill_name] = {
-                        "path_to_policy": to_absolute_path(
-                            skill_path["path_to_policy"]
-                        ),
-                        "path_to_vnorm": to_absolute_path(skill_path["path_to_vnorm"]),
-                    }
-
-            base_env = make_env(cfg)
-
-            if cfg.render:
-                env = wrap_env(
-                    base_env,
-                    cfg,
-                    start_states=cluster,
-                    subgoal=cfg.recoveries.goal,
-                    cluster_key=key,
-                    render_mode="human",
-                )
-            else:
-                env = wrap_env(
-                    base_env,
-                    cfg,
-                    start_states=cluster,
-                    subgoal=cfg.recoveries.goal,
-                    cluster_key=key,
-                    render_mode="rgb_array",
-                )
-            env = DummyVecEnv([lambda: env])
-            init_recovery = RecoverySkillDRL(cfg)
-            init_recovery.load(
-                to_absolute_path(cfg.recoveries.path_to_policy),
-                to_absolute_path(cfg.recoveries.path_to_vnorm),
-                env,
-            )
-
-            # evaluate recovery to compute init set
-            if cfg.cascaded.warmstart_fails:
-                logger.info(
-                    f"  Loading unsolved fails from {cfg.cascaded.unsolved_fails_filename}"
-                )
-                unsolved_fails = pkl_load(
-                    join(
-                        to_absolute_path(cfg.data_dir),
-                        cfg.cascaded.unsolved_fails_filename,
-                    )
-                )
-            else:
-                logger.info("  Computing init set")
-                init_set, unsolved_fails, eval_info = compute_init_set(
-                    init_recovery, fail_cluster[:50], env, cfg
-                )
-
-            unsolved_states = [fail["state"] for fail in unsolved_fails]
-
-            # train separate recovery on unsolved states
-            recovery.train_policy(
-                lambda: env_fn(unsolved_states, "rgb_array"),
-                lambda: env_fn(unsolved_states, "rgb_array"),
-                cfg,
             )
             recoveries.append(recovery)
 
@@ -1389,98 +776,6 @@ def compute_init_set(recovery, fail_cluster, env, cfg):
     return init_set, unsolved_states, eval_info
 
 
-def robust_evaluate_recoveries(clusters, base_env, cfg):
-    recovery = RecoverySkillDRL(cfg)
-    subgoal = None  # task reward
-
-    for key in cfg.recoveries.clusters:
-        key = tuple(key)
-        fail_cluster = clusters[key]
-        cluster = [fail["state"] for fail in fail_cluster]
-
-        eval_info = {"rews": [], "succs": [], "starts": [], "term_states": []}
-
-        def _make_env():
-            env = SubtaskWrapper(
-                base_env, start_states=cluster, subgoal=cfg.recoveries.goal
-            )
-            if cfg.rl.use_discrete_actions:
-                env = DiscreteActionWrapper(env, cfg.rl)
-                nom_skill = ShelfPlaceSkill(target="target")
-                env.add_action(nom_skill, cost=1)
-            env = VisualizationWrapper(
-                env, indicator_configs=INDICATOR_SITE_CONFIG)
-            env = ImprovedGymWrapper(env, keys=cfg.rl.obs_keys)
-            if cfg.render:
-                env.render_mode = "human"
-            env = DummyVecEnv([lambda: env])
-
-            return env
-
-        env = _make_env()
-        recovery.load(
-            to_absolute_path(cfg.evaluate.path_to_policy),
-            to_absolute_path(cfg.evaluate.path_to_vnorm),
-            env,
-        )
-        for state in tqdm(cluster):
-            env.envs[0].set_start_states([state])
-            eval_info["starts"].append(env.envs[0].observe_true_state())
-            succs = []
-            for _ in range(cfg.recoveries.n_robust_evaluations):
-                # resample uncertainty
-                obs = env.reset()
-                if cfg.render:
-                    for _ in range(25):
-                        env.render()
-                env.envs[0].set_indicator_pos(
-                    "indicator0", env.envs[0]._target_pos)
-                obs, rew, done, info = recovery.apply(obs)
-                eval_info["term_states"].append(
-                    env.envs[0].observe_true_state())
-                eval_info["rews"].append(rew)
-                succs.append(info[0]["is_success"])
-            eval_info["succs"].append(np.mean(succs))
-
-        pkl_dump(eval_info, "eval_info.pkl")
-
-        logger.info("Evaluation stats:")
-        logger.info("------------------")
-        logger.info(f"  Reward: mean: {np.mean(eval_info['rews'])}")
-        logger.info(f"  Success rate: {np.mean(eval_info['succs'])*100}%")
-
-        thresh = 0.75
-        succs = np.array(eval_info["succs"])
-        logger.info(
-            f"  Robust coverage (thresh={thresh}): {np.mean(succs >= thresh)*100}%"
-        )
-        solved_states = np.array(cluster)[succs >= thresh]
-        unsolved_states = np.array(cluster)[succs < thresh]
-        pkl_dump(solved_states, "solved_states.pkl")
-        pkl_dump(unsolved_states, "unsolved_states.pkl")
-
-        # visualize precondition
-        start_states = np.array([start["obs"]["slip"]
-                                for start in eval_info["starts"]])
-        y = np.array(eval_info["succs"])
-        plt.scatter(
-            start_states[y == 0],
-            np.zeros(len(start_states[y == 0])),
-            color="r",
-            label="Fail",
-        )
-        plt.scatter(
-            start_states[y == 1],
-            np.zeros(len(start_states[y == 1])),
-            color="g",
-            label="Success",
-        )
-        plt.title("Slip vs success")
-        plt.savefig("slip_vs_success.png")
-
-    return eval_info
-
-
 def evaluate_recovery_chain(base_env, cfg):
     recovery = RecoverySkillDRL(cfg)
     pick_skill, goto_skill, place_skill = get_nominal_skills(
@@ -1650,13 +945,6 @@ def record_nominal_traj(nom_skills, n_trajs, cfg):
     logger.info(f"Saving images from {n_trajs} trajectories.")
 
 
-def viz_clusters(clusters, env):
-    pass
-
-
-# def viz_preconditions(env, skills):
-
-
 # --------
 # Evaluation methods
 # ---------
@@ -1820,10 +1108,7 @@ def main(cfg):
             cfg.data_dir = cfg.shelf_data_dir
             cfg.value_fn.obs_keys = cfg.value_fn.shelf_obs_keys
     elif cfg.env.env_name == "PickPlaceBread":
-        if cfg.rl.algorithm == "BC":
-            cfg.data_dir = cfg.pick_place_bc_data_dir
-        else:
-            cfg.data_dir = cfg.pick_place_data_dir
+        cfg.data_dir = cfg.pick_place_data_dir
     elif cfg.env.env_name == "Door":
         cfg.data_dir = cfg.door_data_dir
     elif cfg.env.env_name == "PickBread":
@@ -1895,15 +1180,6 @@ def main(cfg):
         cfg["value_fn"]["model_filename"] = "value_fn.pt"
         cfg["value_fn"]["scaler_filename"] = "value_fn_scaler.pkl"
 
-    if cfg.q_value.learn:
-        if "pos" in demos:
-            all_demos = demos["pos"] + demos["neg"]
-        else:
-            all_demos = demos
-        q_value = fit_nominal_q_value(all_demos, cfg.q_value)
-        # q_value = fit_nominal_q_value(demos["pos"], cfg.q_value)
-        cfg["q_value"]["model_filename"] = "q_value.d3"
-
     #  Cluster failures
     if cfg.clusters.learn:
         logger.info("Clustering failures")
@@ -1915,10 +1191,6 @@ def main(cfg):
         clusters = pkl_load(join(to_absolute_path(
             cfg.data_dir), cfg.clusters.filename))
 
-    if cfg.clusters.viz:
-        viz_clusters(clusters, env_sim)
-    # ----------
-
     # Recovery learning
     if cfg.recoveries.learn:
         logger.info("Learning recoveries")
@@ -1929,28 +1201,15 @@ def main(cfg):
             )
         else:
             recoveries = None
-        if cfg.cascaded.learn:
-            recoveries = learn_cascaded_recoveries(
-                clusters["train"], cfg, warmstart=recoveries
-            )
-        else:
-            recoveries = learn_recoveries(
-                clusters["train"], cfg, warmstart=recoveries)
+
+        recoveries = learn_recoveries(
+            clusters["train"], cfg, warmstart=recoveries)
     else:
         logger.info("Loading recoveries")
         logger.info("-------------------")
         # recoveries = pkl_load(
         # join(to_absolute_path(cfg.data_dir), cfg.recoveries.filename)
         # )
-
-    if cfg.bc.learn:
-        # train a behavior cloning policy
-        logger.info("Learning policy using behavior cloning")
-        logger.info("-------------------")
-        expert_policy = get_expert_policy(cfg.env.env_name)
-        policy = learn_bc_policy(
-            demos, cfg, iterations=cfg.bc.iterations, expert_policy=expert_policy
-        )
 
     # Evluate learned recoveries
     if cfg.evaluate.evaluate_recovery:
@@ -2002,88 +1261,8 @@ def main(cfg):
                 f"  Nominal mean SR: {np.mean(nom_succs)*100}: {np.sum(nom_succs)} / {np.concatenate(nom_succs).size}"
             )
 
-    # Evaluate each world state with different amounts of uncertainty
-    elif cfg.evaluate.robust_evaluate:
-        eval_env = make_env(cfg, test=True)
-        eval_info = robust_evaluate_recoveries(clusters["test"], eval_env, cfg)
-
-    if cfg.evaluate.viz_preconds:
-        env = make_env(cfg, test=True)
-        pos_demos = [demo for demo in demos if demo["reward"][-1] > 0]
-
-        preconds = {}
-        for demo in pos_demos:
-            for obs, action in zip(demo["state"], demo["action"]):
-                if action in preconds:
-                    preconds[action].append(obs)
-                else:
-                    preconds[action] = [obs]
-
-        # sns.set(style="white", palette="muted", color_codes=True)
-
-        if cfg.env.env_name == "PickPlaceBread":
-            nskills = len(preconds)
-            # for skill_id in range(nskills):
-            artists = []
-            for skill_id in [1]:
-                states = preconds[skill_id]
-                X = np.array([state["obs"]["robot0_eef_pos"][:2]
-                             for state in states])
-                kde = sns.kdeplot(
-                    x=X[:, 0],
-                    y=X[:, 1],
-                    fill=True,
-                    thresh=0.1,
-                    legend=True,
-                    levels=10,
-                    alpha=0.8,
-                    label=f"skill {skill_id}",
-                )
-            X = np.array([state["obs"]["robot0_eef_pos"][:2]
-                         for state in fails])
-            plt.scatter(X[:, 0], X[:, 1], color="k",
-                        marker="x", label="failure")
-            plt.xlabel("x")
-            plt.ylabel("y")
-            plt.legend(fontsize="large", loc="upper left")
-            plt.tight_layout()
-            # plt.show()
-            plt.savefig("precond_viz.png")
-
-        elif cfg.env.env_name == "ShelfEnv":
-            nskills = len(preconds)
-
-            # for skill_id in range(nskills):
-            def get_features(x):
-                return x["box_pos"][1:] - x["target_pos"][1:]
-
-            # for skill_id in range(nskills):
-            for skill_id in [2]:
-                states = preconds[skill_id]
-                X = np.array([get_features(state) for state in states])
-                kde = sns.kdeplot(
-                    x=X[:, 0],
-                    y=X[:, 1],
-                    fill=True,
-                    legend=True,
-                    levels=10,
-                    alpha=0.8,
-                    label=f"skill {skill_id}",
-                )
-            X = np.array([get_features(state) for state in fails])
-            plt.scatter(X[:, 0], X[:, 1], color="k",
-                        marker="x", label="failure")
-            plt.xlabel("relative y")
-            plt.ylabel("relative z")
-            plt.legend(fontsize="large", loc="upper left")
-            plt.tight_layout()
-            # plt.show()
-            plt.savefig("precond_viz.png")
-
     if cfg.use_wandb:
         run.finish()
-
-    # pkl_dump(eval_info, "eval_info.pkl")
 
 
 if __name__ == "__main__":

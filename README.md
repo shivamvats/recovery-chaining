@@ -1,12 +1,26 @@
-# belief_srs: Hierarchical reinforcement learning for manipulation
+# recovery_chaining: Hierarchical reinforcement learning for manipulation
 
-## Features
 
 Provide a summary of what the software does, why it's important and a list of features.
 
 ## Installation
 
-Run ```pip install -e .```
+This repository is designed to be used with the [Anaconda](https://www.anaconda.com/products/distribution) package manager and has been tested with Python 3.10.
+
+First, install Anaconda or Miniconda. Then, create a new conda environment with the following command:
+
+```conda env create -f environment.yml```
+
+This will create a new conda environment named `recovery_chaining` with all the required dependencies.
+
+Next, activate the environment:
+
+```conda activate recovery_chaining```
+
+Finally, install the package in editable mode. This allows you to make changes to the code and have them reflected immediately without needing to reinstall the package.
+
+```pip install -e .```
+
 
 ## Usage
 

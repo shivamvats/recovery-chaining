@@ -1,17 +1,9 @@
 defaults:
 
-  #- rl: drl
-  #- env: shelf #task
-  #- rl: drl_shelf
-
-  #- env: pick_place
-  #- rl: drl_pick_place
-
   - env: pick_place #shelf_clutter
   - rl: rc_pick_place #rc_shelf_clutter
 
   - ctrl: osc_pose
-  #- override hydra/launcher: joblib
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
@@ -25,13 +17,11 @@ hydra:
     subdir: ${hydra.job.num}
 
 output_dir: ./outputs
-seed: 92
+seed: 42
 tag: ''
-#group: rss_${env.env_name}
-group: rss_rebuttal
+group: debug
 comment:
 
-#task: ShelfEnv #PlaceAtEdge #Stack
 nevals: 100
 render: False
 use_ray: False
@@ -53,7 +43,7 @@ device: cuda #gpu
 #
 # Shelf
 # option-time
-shelf_data_dir: /home/svats2/research/belief_srs/data/shelf/31-Jan
+shelf_data_dir: ../../data/shelf/31-Jan
 
 # pick-place
 # for all rl methods
@@ -214,8 +204,7 @@ q_value:
   privileged_critic: False #True
   #model_filename: ${data_dir}/q_value_fn.pt
   model_filename:
-  #model_run_path: iam-lab/merl_hrl/100nfb16
-  model_run_path: iam-lab/merl_hrl/oz9eah7v
+  model_run_path: iam-lab
   algo_n_steps: 50_000 #1_000_000 #400_000 # CQL paper used 1M
   algo_n_steps_per_epoch: 5_000
   n_steps: 500_000
@@ -225,27 +214,6 @@ q_value:
   batch_size: 32
   gamma: 0.99
   drop_last_obs: True
-
-  # Shelf
-  #obs_keys: [
-    #"robot0_eef_rpy", "robot0_gripper_pos", "robot0_eef_forces",
-    #"robot_grasping_box", "robot_touching_box", "collision", "obj_contacts",
-    #"box_rpy", "box_dims",
-    #"shelf_dims",
-    #"clutter0_rpy",
-    #"option_time",
-    ## relative positions in eef frame
-    ## ------
-    ## for better generalization and
-    ## to ensure doesn't overfit to global pos
-    #"robot0_eef_to_box", "robot0_eef_toclutter0", "robot0_eef_to_shelf", "clutter0_to_box",
-    ## global positions
-    ## #----
-    ##"robot0_eef_pos",
-    ##"box_pos",
-    ##"shelf_pos",
-    ##"clutter0_pos",
-  #]
 
   # PickPlace
   obs_keys: ['object-state', 'robot0_proprio-state']

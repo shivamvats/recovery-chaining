@@ -20,7 +20,6 @@ from tqdm import tqdm
 
 from .ppo import PPO
 from .ppo_precond import PPOPrecond
-from .ppo_term_q import PPOTermQ
 from .robot_skill import RobotSkill
 from .utils import EvalCallback, WandbCallback
 
@@ -103,14 +102,9 @@ class RecoverySkillDRL:
                 norm_reward=self.rl_cfg.norm_reward,
                 norm_obs=True,
             )
-        if algorithm == "PPOTermQ":
-            num_cpus_rollout = self.rl_cfg[algorithm].critic.n_cpus_rollout
-            if num_cpus_rollout < 0:
-                num_cpus_rollout = self.cfg.num_cpus
-        else:
-            num_cpus_rollout = self.cfg.num_cpus
+        num_cpus_rollout = self.cfg.num_cpus
 
-        if algorithm == "PPOTermQ" or self.rl_cfg.evaluate:
+        if self.rl_cfg.evaluate:
             if num_cpus_rollout == 1:
                 rollout_env = VecNormalize(
                     DummyVecEnv(
@@ -188,34 +182,9 @@ class RecoverySkillDRL:
             callbacks.append(eval_callback_det)
             logger.info("  Adding eval callback")
 
-        if self.rl_cfg.algorithm == "PPOTermQ":
-            rl_cfg["n_steps"] = max(rl_cfg["n_steps"] // self.cfg.num_cpus, 1)
-            if self.model is None:
-                rl_agent = PPOTermQ(
-                    "MlpPolicy",
-                    train_env,
-                    **rl_cfg,
-                    policy_kwargs=policy_kwargs,
-                    verbose=1,
-                    tensorboard_log=".",
-                    device=device,
-                    num_nominal_actions=train_env.get_attr(
-                        "num_nominal_actions")[0],
-                    cfg=self.cfg,
-                    rollout_env=rollout_env,
-                )
-            else:
-                rl_agent = self.model
+            rl_agent = self.model
 
-            rl_agent.learn(
-                total_timesteps=self.rl_cfg.learn.n_total_steps,
-                # demo_trajs=
-                callback=callbacks,
-                tb_log_name="PPO",
-                reset_num_timesteps=False,
-                cfg=self.cfg,
-            )
-        elif self.rl_cfg.algorithm == "PPO":
+        if self.rl_cfg.algorithm == "PPO":
             rl_cfg["n_steps"] = max(rl_cfg["n_steps"] // self.cfg.num_cpus, 1)
 
             if self.model is None:
