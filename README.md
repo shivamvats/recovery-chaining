@@ -1,7 +1,6 @@
-# recovery_chaining: Hierarchical reinforcement learning for manipulation
+# RecoveryChaining
 
-
-Provide a summary of what the software does, why it's important and a list of features.
+Code for the paper [RecoveryChaining: Learning Local Recovery Policies for Robust Manipulation](https://arxiv.org/pdf/2410.13979) (currently under review).
 
 ## Installation
 
@@ -21,43 +20,20 @@ Finally, install the package in editable mode. This allows you to make changes t
 
 ```pip install -e .```
 
-
 ## Usage
-
-## Reproduce
 
 ### Collect failures
 
-python scripts/learn_recoveries.py failures.learn=True env=shelf rl=drl_shelf tag="failures" output_dir=data/shelf/31-Jan
+```python scripts/learn_recoveries.py failures.learn=True env=pick_place rl=rc_pick_place failures.nfails=100```
 
-### Learn Preconditions
-
-python scripts/learn_recoveries.py value_fn.learn=True
+This will roll out the nominal controllers for the `pick-place` environment and record 100 failures. The results will be saved in the `belief_srs/outputs` by default. Move the generated files to a data folder (e.g. `data/pick_place`) so that they can be reused to learn recoveries.
 
 ### Learn Recoveries
 
-**Recovery Chaining Results**
+```scripts/learn_recoveries.py recoveries.learn=True env=pick_place rl=rc_pick_place pick_place_data_dir=data/pick_place```
 
-seeds = 42, 52, 19, 74, 102
+This will train a recovery policy to solve the collected failures using RecoveryChaining.
 
-scripts/learn_recoveries.py recoveries.learn=True tag=rc rl.algorithm=PPO env=pick_place rl=drl_pick_place seed=42 output_dir=results/rss/pick_place/rc
+Run the following script to use Lazy RecoveryChaining:
 
-scripts/learn_recoveries.py recoveries.learn=True tag=rc rl.algorithm=PPO env=shelf rl=drl_shelf seed=42 output_dir=results/rss/shelf/rc
-
-** RL results**
-
-python scripts/learn_recoveries.py recoveries.learn=True tag=rl rl.algorithm=PPO  env=pick_place rl=rl seed=52 output_dir=results/rss/pick_place/rl env.reward_shaping=True
-
-## Evaluation
-
-python scripts/learn_recoveries.py evaluate.evaluate_chain=True env=pick_place rl=drl_pick_place  nevals=50
-
-## Related Links
-
-Add any related links, such as cwiki pages, fileserver folders, etc.
-
-## Contact
-
-Add your contact details
-
-## License
+```scripts/learn_recoveries.py recoveries.learn=True env=pick_place rl=rc_pick_place pick_place_data_dir=data/pick_place rl.use_nominal_precond=True```
