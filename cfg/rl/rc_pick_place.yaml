@@ -54,6 +54,8 @@ reward:
 
 #PickPlaceBread
 obs_keys: ['object-state', 'robot0_proprio-state']
+privileged_obs_keys: ['object-state', 'robot0_proprio-state']
+
 
 PPOTermQ:
   params:
